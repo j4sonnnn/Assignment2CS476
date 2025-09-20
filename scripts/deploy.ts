@@ -1,21 +1,24 @@
 import "dotenv/config";
 import { artifacts } from "hardhat";
-import { createWalletClient, createPublicClient, http, parseUnits, getAddress } from "viem";
+import {
+  createWalletClient,
+  createPublicClient,
+  http,
+  parseUnits,
+} from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 
 const RPC_URL = process.env.RPC_URL!;
 const CHAIN_ID = Number(process.env.CHAIN_ID!);
 const PRIVATE_KEY = (process.env.PRIVATE_KEY || "").replace(/^0x/, "");
 
-const NAME = process.env.TOKEN_NAME || "CampusCredit";
-const SYMBOL = process.env.TOKEN_SYMBOL || "CAMP";
-const CAP_HUMAN = process.env.TOKEN_CAP || "2000000";
-const INIT_HUMAN = process.env.TOKEN_INITIAL || "1000000";
-
 async function main() {
-  if (!RPC_URL || !CHAIN_ID || !PRIVATE_KEY) throw new Error("Missing env vars");
+  if (!RPC_URL || !CHAIN_ID || !PRIVATE_KEY) {
+    throw new Error("Missing RPC_URL / CHAIN_ID / PRIVATE_KEY in .env");
+  }
 
-  const { abi, bytecode } = await artifacts.readArtifact("CampusCreditV2");
+  // Load the new CampusCredit contract (Assignment 2 version)
+  const { abi, bytecode } = await artifacts.readArtifact("CampusCredit");
 
   const chain = {
     id: CHAIN_ID,
@@ -27,21 +30,18 @@ async function main() {
   const account = privateKeyToAccount(`0x${PRIVATE_KEY}`);
   const wallet = createWalletClient({ account, chain, transport: http(RPC_URL) });
   const publicClient = createPublicClient({ chain, transport: http(RPC_URL) });
-  console.log("DEBUG values:", { CAP_HUMAN, INIT_HUMAN });
-  const cap = parseUnits(CAP_HUMAN.toString(), 18);
-  const initialMint = parseUnits(INIT_HUMAN.toString(), 18);
 
+  // Assignment 2 requires constructor(initialSupply)
+  const supply = parseUnits("1000000", 18); // 1 million CAMP
 
-  console.log("Deploying CampusCreditV2…");
+  console.log("Deploying CampusCredit...");
   const hash = await wallet.deployContract({
     abi,
     bytecode,
-    args: [NAME, SYMBOL, cap, getAddress(account.address), initialMint],
-    maxPriorityFeePerGas: 2_000_000_000n, // 2 gwei
-    maxFeePerGas: 20_000_000_000n, // 20 gwei
+    args: [supply],   // constructor argument
   });
-  console.log("Deploy tx:", hash);
 
+  console.log("Deploy tx:", hash);
   const rcpt = await publicClient.waitForTransactionReceipt({ hash });
   console.log("Deployed at:", rcpt.contractAddress);
   console.log("Block:", rcpt.blockNumber);
